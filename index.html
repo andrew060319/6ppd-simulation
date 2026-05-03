@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>6PPD-퀴논 한국 연안 위해성 예측 시뮬레이션</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy: #1a2b4a;
+    --orange: #f97316;
+    --gray: #6b7280;
+    --light-gray: #f3f4f6;
+    --red: #ef4444;
+    --green: #10b981;
+    --blue: #3b82f6;
+    --text: #111827;
+    --border: #e5e7eb;
+  }
+  body { font-family: 'Noto Sans KR', sans-serif; background: #fff; color: var(--text); font-size: 14px; line-height: 1.6; }
+
+  /* HEADER */
+  #header {
+    background: var(--navy); color: #fff; padding: 28px 48px;
+    display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  }
+  #header h1 { font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
+  #header p  { font-size: 12px; color: #93c5fd; margin-top: 4px; }
+  .warning-badge {
+    background: rgba(249,115,22,.15); border: 1px solid var(--orange); color: var(--orange);
+    border-radius: 6px; padding: 8px 14px; font-size: 11px; font-weight: 600;
+    max-width: 280px; text-align: center; line-height: 1.4;
+  }
+
+  /* SECTIONS */
+  .section { padding: 40px 48px; border-bottom: 1px solid var(--border); }
+  .section-title {
+    font-size: 16px; font-weight: 700; color: var(--navy); margin-bottom: 24px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-title svg { flex-shrink: 0; }
+
+  /* PREDICTED BADGE */
+  .predicted-badge {
+    display: inline-block; background: rgba(249,115,22,.12); border: 1px solid var(--orange);
+    color: var(--orange); font-size: 10px; font-weight: 700; padding: 2px 7px;
+    border-radius: 4px; letter-spacing: .5px; vertical-align: middle;
+  }
+
+  /* CONTROL PANEL */
+  #controls { background: var(--light-gray); }
+  .sliders-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 48px; }
+  .slider-row { display: flex; flex-direction: column; gap: 8px; }
+  .slider-label { display: flex; justify-content: space-between; align-items: baseline; }
+  .slider-label span:first-child { font-weight: 600; font-size: 13px; color: var(--navy); }
+  .slider-value { font-size: 18px; font-weight: 700; color: var(--orange); }
+  .slider-unit { font-size: 12px; color: var(--gray); margin-left: 3px; }
+  input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; background: #d1d5db; border-radius: 3px; outline: none; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; background: var(--orange); border-radius: 50%; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+  .slider-range-hint { font-size: 11px; color: var(--gray); display: flex; justify-content: space-between; }
+
+  /* PANORAMA SECTION */
+  #animation-section { background: #0c1520; }
+  #animation-section .section-title { color: #e2e8f0; }
+  .panorama-wrap {
+    position: relative; margin-bottom: 28px;
+    border-radius: 10px; overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,.4);
+  }
+  #panoramaCanvas { width: 100%; display: block; }
+  .panorama-hint {
+    margin-top: 8px; text-align: center; font-size: 11px; color: #64748b;
+    letter-spacing: .3px;
+  }
+
+  /* ZONE POPUP MODAL */
+  .zone-modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.55); z-index: 300;
+    align-items: center; justify-content: center;
+  }
+  .zone-modal-overlay.open { display: flex; }
+  .zone-modal-box {
+    background: #fff; border-radius: 14px; padding: 32px;
+    max-width: 500px; width: 90%; position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,.35);
+    animation: slideUp .2s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .modal-close {
+    position: absolute; top: 14px; right: 18px;
+    border: none; background: none; font-size: 22px; cursor: pointer; color: var(--gray); line-height: 1;
+  }
+  .modal-close:hover { color: var(--text); }
+  .modal-zone-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .modal-zone-accent { width: 4px; height: 44px; background: var(--orange); border-radius: 2px; flex-shrink: 0; }
+  .modal-zone-name { font-size: 20px; font-weight: 700; color: var(--navy); }
+  .modal-zone-dist { font-size: 12px; color: var(--gray); margin-top: 2px; }
+  .modal-conc-box {
+    background: var(--light-gray); border-radius: 10px; padding: 18px;
+    margin-bottom: 16px; text-align: center;
+  }
+  .modal-conc-label { font-size: 12px; color: var(--gray); margin-bottom: 4px; }
+  .modal-conc-num { font-size: 36px; font-weight: 700; color: var(--orange); line-height: 1; }
+  .modal-conc-unit { font-size: 13px; color: var(--gray); margin-top: 4px; }
+  .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .modal-info-card { padding: 12px; background: #fff; border: 1px solid var(--border); border-radius: 8px; }
+  .modal-info-label { font-size: 11px; color: var(--gray); margin-bottom: 3px; }
+  .modal-info-val { font-size: 13px; font-weight: 600; }
+  .modal-warn-box { font-size: 12px; padding: 10px 12px; background: rgba(249,115,22,.06); border-left: 3px solid var(--orange); border-radius: 4px; color: #374151; }
+
+  /* DISTANCE SLIDER */
+  .distance-slider-row { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .distance-slider-row label { font-weight: 600; color: #94a3b8; white-space: nowrap; font-size: 13px; }
+  .distance-slider-row .dist-val { font-weight: 700; color: var(--orange); min-width: 60px; font-size: 16px; }
+  .coastal-chart-wrap { height: 240px; position: relative; }
+
+  /* GAUGE SECTION */
+  .gauge-row { display: block; margin-top: 24px; margin-bottom: 24px; }
+  .gauge-wrap { display: flex; flex-direction: column; gap: 12px; }
+  .gauge-container { position: relative; width: 100%; height: 36px; background: var(--light-gray); border-radius: 18px; border: 1px solid var(--border); overflow: hidden; }
+  .gauge-fill { position: absolute; top: 0; bottom: 0; left: 0; background: linear-gradient(to right, #f97316, #fbbf24); transition: width .4s ease; border-radius: 18px; }
+  .gauge-value-display { text-align: center; margin-bottom: 8px; }
+  .gauge-value-display .big-num { font-size: 32px; font-weight: 700; color: var(--orange); display: inline-block; margin-right: 8px; }
+  .gauge-value-display .unit-label { font-size: 14px; color: var(--gray); font-weight: 600; }
+
+  /* FISH TABS */
+  .tabs-nav { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 28px; }
+  .tab-btn { padding: 12px 24px; border: none; background: none; font-family: inherit; font-size: 13px; font-weight: 600; color: var(--gray); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all .15s; }
+  .tab-btn:hover { color: var(--navy); }
+  .tab-btn.active { color: var(--orange); border-bottom-color: var(--orange); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .fish-panel { display: grid; grid-template-columns: 180px 1fr; gap: 32px; align-items: start; }
+  .fish-svg-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .fish-svg-wrap svg { width: 140px; height: auto; }
+  .fish-name-ko { font-weight: 700; font-size: 14px; text-align: center; color: var(--navy); }
+  .fish-name-sci { font-size: 11px; color: var(--gray); text-align: center; font-style: italic; }
+  .fish-info { display: flex; flex-direction: column; gap: 16px; }
+  .mortality-label-row { display: flex; justify-content: space-between; margin-bottom: 6px; align-items: baseline; }
+  .mortality-label { font-weight: 600; font-size: 13px; color: var(--navy); }
+  .mortality-pct { font-size: 24px; font-weight: 700; }
+  .mortality-bar-track { height: 16px; background: var(--light-gray); border-radius: 8px; overflow: hidden; }
+  .mortality-bar-fill { height: 100%; border-radius: 8px; transition: width .4s ease; }
+  .fish-desc { font-size: 13px; color: #374151; line-height: 1.7; padding: 14px; background: var(--light-gray); border-radius: 8px; }
+  .lc50-info { font-size: 12px; color: var(--gray); }
+  .risk-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+  .risk-high   { background: rgba(239,68,68,.12); color: #b91c1c; }
+  .risk-medium { background: rgba(245,158,11,.12); color: #92400e; }
+  .risk-low    { background: rgba(16,185,129,.12); color: #065f46; }
+
+  /* FOOTER */
+  footer { background: var(--navy); color: #94a3b8; text-align: center; padding: 20px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══ -->
+<header id="header">
+  <div>
+    <h1>6PPD-퀴논 한국 연안 위해성 예측 시뮬레이션</h1>
+    <p>도로에서 바다까지 — 보이지 않는 오염의 경로</p>
+  </div>
+  <div class="warning-badge">⚠ 본 시뮬레이션은 예측 모델이며<br>실측 자료가 아닙니다</div>
+</header>
+
+<!-- ═══ SECTION 2: CONTROLS ═══ -->
+<section class="section" id="controls">
+  <div class="section-title">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+    입력 변수 설정 — 서울
+  </div>
+  <div class="sliders-grid">
+    <div class="slider-row">
+      <div class="slider-label">
+        <span>차량 수</span>
+        <div><span class="slider-value" id="val-vehicles">3,200,000</span><span class="slider-unit">대</span></div>
+      </div>
+      <input type="range" id="sl-vehicles" min="1000000" max="5000000" step="100000" value="3200000" oninput="onSlider()">
+      <div class="slider-range-hint"><span>100만</span><span>500만</span></div>
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">
+        <span>강수량</span>
+        <div><span class="slider-value" id="val-rainfall">50</span><span class="slider-unit">mm</span></div>
+      </div>
+      <input type="range" id="sl-rainfall" min="5" max="100" step="1" value="50" oninput="onSlider()">
+      <div class="slider-range-hint"><span>5 mm</span><span>100 mm</span></div>
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">
+        <span>도로 면적 비율</span>
+        <div><span class="slider-value" id="val-road">24</span><span class="slider-unit">%</span></div>
+      </div>
+      <input type="range" id="sl-road" min="10" max="40" step="1" value="24" oninput="onSlider()">
+      <div class="slider-range-hint"><span>10%</span><span>40%</span></div>
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">
+        <span>선행 건조 기간</span>
+        <div><span class="slider-value" id="val-dry">7</span><span class="slider-unit">일</span></div>
+      </div>
+      <input type="range" id="sl-dry" min="1" max="14" step="1" value="7" oninput="onSlider()">
+      <div class="slider-range-hint"><span>1일</span><span>14일</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECTION 3: PANORAMIC FLOW + COASTAL CHART ═══ -->
+<section class="section" id="animation-section">
+  <div class="section-title">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    6PPD-퀴논 이동 경로 — 서울 도로에서 서해까지
+  </div>
+
+  <div class="panorama-wrap">
+    <canvas id="panoramaCanvas" width="1184" height="370"></canvas>
+  </div>
+  <div class="panorama-hint">한강 하구 · 경기만 내해 · 경기만 외해 · 서해 연안 구역을 클릭하면 박스 모델 상세 정보를 확인할 수 있습니다</div>
+
+  <!-- Coastal chart -->
+  <div class="distance-slider-row" style="margin-top:32px;">
+    <label>거리 탐색</label>
+    <input type="range" id="sl-distance" min="0" max="150" step="1" value="0" style="width:300px;" oninput="onDistanceSlider()">
+    <span class="dist-val"><span id="val-distance">0</span> km</span>
+    <span style="font-size:12px;color:#94a3b8;">→ <span class="predicted-badge">PREDICTED</span> <span id="dist-conc-val" style="color:var(--orange);">—</span> ng/L</span>
+  </div>
+  <div class="coastal-chart-wrap">
+    <canvas id="coastalChart"></canvas>
+  </div>
+</section>
+
+<!-- ═══ SECTION 4: GAUGE + COMPARISON ═══ -->
+<section class="section" id="gauge-section">
+  <div class="section-title">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+    한강 하구 예측 농도 &nbsp;<span class="predicted-badge">PREDICTED</span>
+  </div>
+  <div class="gauge-row">
+    <div class="gauge-wrap">
+      <div class="gauge-value-display">
+        <span class="big-num" id="gauge-num">—</span>
+        <span class="unit-label">ng/L <span class="predicted-badge">PREDICTED</span></span>
+      </div>
+      <div style="position:relative; width:100%;">
+        <div class="gauge-container" id="gauge-container">
+          <div class="gauge-fill" id="gauge-fill"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--gray); margin-top:8px; padding:0 4px; font-weight:500;">
+          <span>0 ng/L</span>
+          <span>1,000 ng/L</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECTION 5: FISH TABS ═══ -->
+<section class="section" id="fish-section">
+  <div class="section-title">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 12C6.5 9 4 5 4 5c4 0 7 2 8.5 5.5C14 14 17 16 20 16c0 0-2.5-4-2.5-7 0 0 3 3 3 7s-3 7-3 7c-3 0-6-2-7.5-5.5C8.5 14 5.5 12 2 12c0 0 2.5 4 2.5 7 0 0-3-3-3-7s3-7 3-7c0 0 2 4 2 7z"/></svg>
+    어종별 영향 분석
+  </div>
+  <div class="tabs-nav">
+    <button class="tab-btn active" onclick="switchTab(0)">숭어 · 재두루미</button>
+    <button class="tab-btn" onclick="switchTab(1)">바지락 · 칠게</button>
+    <button class="tab-btn" onclick="switchTab(2)">상괭이 · 조기</button>
+    <button class="tab-btn" onclick="switchTab(3)">흰발농게 · 꽃게</button>
+  </div>
+
+  <!-- Tab 0: 한강 하구 — 숭어 · 재두루미 -->
+  <div class="tab-panel active" id="tab-0">
+    <div class="fish-panel">
+      <div class="fish-svg-wrap">
+        <!-- 숭어 (Mugil cephalus) -->
+        <svg viewBox="0 0 140 80" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="70" cy="40" rx="52" ry="18" fill="#a8bcc8" opacity=".92"/>
+          <path d="M18 40 Q4 29 2 40 Q4 51 18 40Z" fill="#8aaabb"/>
+          <ellipse cx="108" cy="40" rx="18" ry="10" fill="#c0d2dc"/>
+          <circle cx="116" cy="36" r="3.5" fill="#fff"/>
+          <circle cx="117" cy="36" r="1.8" fill="#1a2b4a"/>
+          <path d="M92 30 Q106 20 118 26" stroke="#8aaabb" stroke-width="2.5" fill="none"/>
+          <path d="M92 50 Q106 60 118 54" stroke="#8aaabb" stroke-width="2.5" fill="none"/>
+          <path d="M66 22 Q70 15 76 22" stroke="#7090a0" stroke-width="2" fill="none"/>
+          <path d="M38 36 Q50 30 62 36" stroke="#7090a0" stroke-width="1" fill="none" opacity=".5"/>
+          <path d="M58 36 Q70 30 82 36" stroke="#7090a0" stroke-width="1" fill="none" opacity=".5"/>
+          <path d="M78 36 Q90 30 100 36" stroke="#7090a0" stroke-width="1" fill="none" opacity=".5"/>
+          <line x1="30" y1="40" x2="105" y2="40" stroke="#5a7a8a" stroke-width="0.8" opacity=".4"/>
+          <path d="M111 42 Q114 47 110 50" stroke="#6a8090" stroke-width="1.5" fill="none"/>
+        </svg>
+        <div class="fish-name-ko">숭어</div>
+        <div class="fish-name-sci">Mugil cephalus</div>
+      </div>
+      <div class="fish-info">
+        <div style="margin-bottom:8px;">
+          <span style="font-weight:600;font-size:13px;color:var(--navy);">한강 하구 노출 위험 등급 &nbsp;<span class="predicted-badge">PREDICTED</span></span><br>
+          <span class="risk-badge risk-medium" id="mullet-risk" style="margin-top:8px;display:inline-block;">평가 중...</span>
+        </div>
+        <div class="lc50-info">주요 피해 요인: 만성 독성 및 2차 노출 위험</div>
+        <div class="fish-desc" id="mullet-desc"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 1: 경기만 내해 — 바지락 · 칠게 -->
+  <div class="tab-panel" id="tab-1">
+    <div class="fish-panel">
+      <div class="fish-svg-wrap">
+        <!-- 바지락 (Ruditapes philippinarum) -->
+        <svg viewBox="0 0 140 80" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="70" cy="46" rx="42" ry="26" fill="#c8a87a" opacity=".9"/>
+          <ellipse cx="70" cy="44" rx="40" ry="24" fill="#d8b88a" opacity=".85"/>
+          <path d="M30 44 Q70 20 110 44" stroke="#a0784a" stroke-width="2" fill="none"/>
+          <path d="M35 50 Q70 28 105 50" stroke="#b08858" stroke-width="1.2" fill="none" opacity=".6"/>
+          <path d="M40 56 Q70 36 100 56" stroke="#b08858" stroke-width="1" fill="none" opacity=".5"/>
+          <path d="M45 62 Q70 44 95 62" stroke="#b08858" stroke-width="0.8" fill="none" opacity=".4"/>
+          <path d="M55 38 Q62 34 70 36 Q78 34 85 38" stroke="#906030" stroke-width="1.5" fill="none"/>
+          <ellipse cx="70" cy="68" rx="38" ry="6" fill="#8a6030" opacity=".3"/>
+        </svg>
+        <div class="fish-name-ko">바지락</div>
+        <div class="fish-name-sci">Ruditapes philippinarum</div>
+      </div>
+      <div class="fish-info">
+        <div style="margin-bottom:8px;">
+          <span style="font-weight:600;font-size:13px;color:var(--navy);">경기만 내해 노출 위험 등급 &nbsp;<span class="predicted-badge">PREDICTED</span></span><br>
+          <span class="risk-badge risk-medium" id="clam-risk" style="margin-top:8px;display:inline-block;">평가 중...</span>
+        </div>
+        <div class="lc50-info">주요 피해 요인: 생체 축적 및 직접 접촉에 의한 만성 피해</div>
+        <div class="fish-desc" id="clam-desc"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 2: 경기만 외해 — 상괭이 · 조기 -->
+  <div class="tab-panel" id="tab-2">
+    <div class="fish-panel">
+      <div class="fish-svg-wrap">
+        <!-- 상괭이 (Neophocaena asiaeorientalis) -->
+        <svg viewBox="0 0 140 80" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="68" cy="42" rx="50" ry="22" fill="#708fa0" opacity=".9"/>
+          <path d="M18 42 Q4 32 2 42 Q4 52 18 42Z" fill="#607f90"/>
+          <ellipse cx="110" cy="42" rx="22" ry="15" fill="#88a8b8"/>
+          <ellipse cx="120" cy="40" rx="12" ry="10" fill="#9abac8"/>
+          <circle cx="128" cy="38" r="3" fill="#fff"/>
+          <circle cx="129" cy="38" r="1.8" fill="#1a2b4a"/>
+          <path d="M90 52 Q100 68 80 62 Q85 55 90 52Z" fill="#607f90"/>
+          <path d="M70 20 Q80 14 90 20" stroke="#507080" stroke-width="2" fill="none"/>
+          <ellipse cx="68" cy="42" rx="30" ry="10" fill="#fff" opacity=".08"/>
+          <path d="M110 44 Q116 48 122 44" stroke="#506070" stroke-width="1.5" fill="none"/>
+        </svg>
+        <div class="fish-name-ko">상괭이</div>
+        <div class="fish-name-sci">Neophocaena asiaeorientalis</div>
+      </div>
+      <div class="fish-info">
+        <div style="margin-bottom:8px;">
+          <span style="font-weight:600;font-size:13px;color:var(--navy);">경기만 외해 먹이사슬 농축 위험 등급 &nbsp;<span class="predicted-badge">PREDICTED</span></span><br>
+          <span class="risk-badge risk-high" id="finless-risk" style="margin-top:8px;display:inline-block;">평가 중...</span>
+        </div>
+        <div class="lc50-info">주요 피해 요인: 먹이사슬 최상위 포식자의 생물 농축</div>
+        <div class="fish-desc" id="finless-desc"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 3: 서해 연안 — 흰발농게 · 꽃게 -->
+  <div class="tab-panel" id="tab-3">
+    <div class="fish-panel">
+      <div class="fish-svg-wrap">
+        <!-- 흰발농게 (Uca lactea) -->
+        <svg viewBox="0 0 140 80" xmlns="http://www.w3.org/2000/svg">
+          <!-- 몸통 -->
+          <ellipse cx="70" cy="48" rx="24" ry="16" fill="#d4864a" opacity=".9"/>
+          <!-- 큰 집게발 (좌) -->
+          <ellipse cx="32" cy="44" rx="18" ry="10" fill="#fff" opacity=".95"/>
+          <path d="M48 44 Q40 36 28 38 Q20 42 28 50 Q38 54 48 50" fill="#e8e0d0" stroke="#bbb0a0" stroke-width="1"/>
+          <path d="M32 36 Q26 30 22 34" stroke="#c0b090" stroke-width="2" fill="none"/>
+          <path d="M32 52 Q26 58 22 54" stroke="#c0b090" stroke-width="2" fill="none"/>
+          <!-- 작은 집게발 (우) -->
+          <path d="M90 46 Q100 38 108 42 Q112 46 108 52 Q100 56 90 50" fill="#d4864a" stroke="#b06030" stroke-width="1"/>
+          <!-- 다리 -->
+          <path d="M55 38 Q50 28 44 24" stroke="#b06030" stroke-width="2" fill="none"/>
+          <path d="M62 36 Q60 24 56 18" stroke="#b06030" stroke-width="2" fill="none"/>
+          <path d="M78 36 Q80 24 84 18" stroke="#b06030" stroke-width="2" fill="none"/>
+          <path d="M85 38 Q92 28 96 24" stroke="#b06030" stroke-width="2" fill="none"/>
+          <path d="M55 58 Q50 68 44 72" stroke="#b06030" stroke-width="2" fill="none"/>
+          <path d="M62 60 Q60 70 56 74" stroke="#b06030" stroke-width="2" fill="none"/>
+          <path d="M78 60 Q80 70 84 74" stroke="#b06030" stroke-width="2" fill="none"/>
+          <path d="M85 58 Q92 68 96 72" stroke="#b06030" stroke-width="2" fill="none"/>
+          <!-- 눈 -->
+          <circle cx="62" cy="36" r="3" fill="#fff"/>
+          <circle cx="62" cy="36" r="1.5" fill="#1a2b4a"/>
+          <circle cx="78" cy="36" r="3" fill="#fff"/>
+          <circle cx="78" cy="36" r="1.5" fill="#1a2b4a"/>
+        </svg>
+        <div class="fish-name-ko">흰발농게</div>
+        <div class="fish-name-sci">Uca lactea</div>
+      </div>
+      <div class="fish-info">
+        <div style="margin-bottom:8px;">
+          <span style="font-weight:600;font-size:13px;color:var(--navy);">서해 연안 저서 노출 위험 등급 &nbsp;<span class="predicted-badge">PREDICTED</span></span><br>
+          <span class="risk-badge risk-medium" id="fiddler-risk" style="margin-top:8px;display:inline-block;">평가 중...</span>
+        </div>
+        <div class="lc50-info">주요 피해 요인: 퇴적물 잔류 오염에 의한 장기 만성 노출</div>
+        <div class="fish-desc" id="fiddler-desc"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ ZONE POPUP MODAL ═══ -->
+<div class="zone-modal-overlay" id="zone-modal">
+  <div class="zone-modal-box">
+    <button class="modal-close" onclick="closeZonePopup()">×</button>
+    <div id="zone-modal-body"></div>
+  </div>
+</div>
+
+<footer>
+  본 시뮬레이션은 예측 모델이며 실측 자료가 아닙니다. 모든 결과값은 PREDICTED 라벨이 적용됩니다.<br>
+  보고서: 타이어 유래 신종 해양 오염물질 6PPD-퀴논의 발생 경로 및 생태계 영향 분석
+</footer>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// 상수 정의
+// ══════════════════════════════════════════════════════════════
+
+// [한국 실측]
+const AVG_DAILY_KM    = 38;
+const CITY_AREA_KM2   = 605;
+const RIVER_FLOW_M3S  = 600;
+
+// [국제 문헌]
+const TIRE_WEAR_RATE   = 0.1;
+const SIXPPD_RATIO     = 0.0125;
+const CONVERSION_RATE  = 0.0095;
+const MW_RATIO         = 1.06;
+const RUNOFF_COEFF     = 0.85;
+const HALF_LIFE_HOURS  = 33;
+const TIDAL_SPEED_MS   = 0.5;
+const TIDAL_HALF_DIST  = 15;
+const SED_LOSS_PER_KM  = 0.038;
+const FIRST_FLUSH_ALPHA = 0.5;
+
+
+
+const ZONES = [
+  { label: '한강 하구',   distance: 0,  bio: '재두루미, 숭어',   warn: '집중호우 직후 농도가 급격히 상승합니다. 숭어는 직접 노출에 민감하며, 재두루미는 어류 섭식을 통한 2차 노출 경로가 우려됩니다.' },
+  { label: '경기만 내해', distance: 5,  bio: '바지락, 칠게',     warn: '조류에 의해 오염물질이 유입됩니다. 바지락은 여과섭식으로 생체 농축되며, 칠게는 간조 노출 시 직접 접촉 위험이 높습니다.' },
+  { label: '경기만 외해', distance: 30, bio: '상괭이, 조기',     warn: '상괭이는 먹이사슬(조기 → 상괭이) 경로로 BCF 900 L/kg 수준 농축이 예측됩니다. 조기 역시 표층 수괴 이동 시 노출 가능성이 있습니다.' },
+  { label: '서해 연안',   distance: 80, bio: '흰발농게, 꽃게',   warn: '수층 농도는 낮으나 간조대 퇴적물에 잔류하여 흰발농게·꽃게 등 저서 갑각류에 장기 만성 노출이 지속될 수 있습니다.' },
+];
+
+// ══════════════════════════════════════════════════════════════
+// 계산식
+// ══════════════════════════════════════════════════════════════
+function dailyEmission(v) { return v * AVG_DAILY_KM * TIRE_WEAR_RATE * SIXPPD_RATIO * CONVERSION_RATE * MW_RATIO; }
+function accumulatedMass(v, dry) { return dailyEmission(v) * dry; }
+function runoffVolume(rain_mm, roadRatio, areaKm2) {
+  return (rain_mm / 1000) * (areaKm2 * 1e6 * roadRatio) * RUNOFF_COEFF * 1000;
+}
+function riverConcentration(v, rain, road, dry, area) {
+  const mass  = accumulatedMass(v, dry) * FIRST_FLUSH_ALPHA;
+  const vR    = runoffVolume(rain, road, area);
+  const vRiv  = RIVER_FLOW_M3S * 3600 * 1000;
+  return (mass * 1e9) / (vR + vRiv);
+}
+function coastalConcentration(C0, d) {
+  const dilute = Math.pow(0.5, d / TIDAL_HALF_DIST);
+  const decay  = Math.exp(-(Math.log(2) / HALF_LIFE_HOURS) * (d * 1000) / TIDAL_SPEED_MS / 3600);
+  const sed    = Math.exp(-SED_LOSS_PER_KM * d);
+  return C0 * dilute * decay * sed;
+}
+function calculate(v, rain, road, dry, area) {
+  const C0 = riverConcentration(v, rain, road, dry, area);
+  return ZONES.map(z => ({ ...z, concentration: coastalConcentration(C0, z.distance) }));
+}
+
+// ══════════════════════════════════════════════════════════════
+// State & Charts
+// ══════════════════════════════════════════════════════════════
+let state   = { vehicles: 3200000, rainfall: 50, road: 0.24, dry: 7, area: 605 };
+let results = [];
+let currentTab = 0;
+let coastChart = null;
+
+// ══════════════════════════════════════════════════════════════
+// Slider handlers
+// ══════════════════════════════════════════════════════════════
+function onSlider() {
+  const v  = +document.getElementById('sl-vehicles').value;
+  const r  = +document.getElementById('sl-rainfall').value;
+  const rd = +document.getElementById('sl-road').value / 100;
+  const d  = +document.getElementById('sl-dry').value;
+  document.getElementById('val-vehicles').textContent = v.toLocaleString();
+  document.getElementById('val-rainfall').textContent = r;
+  document.getElementById('val-road').textContent     = (rd * 100).toFixed(0);
+  document.getElementById('val-dry').textContent      = d;
+  state = { ...state, vehicles: v, rainfall: r, road: rd, dry: d };
+  updateAll();
+}
+function onDistanceSlider() {
+  const d = +document.getElementById('sl-distance').value;
+  document.getElementById('val-distance').textContent = d;
+  const C0 = riverConcentration(state.vehicles, state.rainfall, state.road, state.dry, state.area);
+  const c  = coastalConcentration(C0, d);
+  document.getElementById('dist-conc-val').textContent = c.toFixed(2);
+  updateCoastalChart();
+}
+function switchTab(idx) {
+  currentTab = idx;
+  document.querySelectorAll('.tab-panel').forEach((p, i) => p.classList.toggle('active', i === idx));
+  document.querySelectorAll('.tab-btn').forEach((b, i)   => b.classList.toggle('active', i === idx));
+}
+
+// ══════════════════════════════════════════════════════════════
+// Master update
+// ══════════════════════════════════════════════════════════════
+function updateAll() {
+  results = calculate(state.vehicles, state.rainfall, state.road, state.dry, state.area);
+  updateGauge();
+  updateCoastalChart();
+  updateFishTabs();
+}
+
+// ══════════════════════════════════════════════════════════════
+// Gauge
+// ══════════════════════════════════════════════════════════════
+function updateGauge() {
+  const C0     = results[0].concentration;
+  const maxC   = 1000;
+  const pct    = Math.min(C0 / maxC, 1) * 100;
+  document.getElementById('gauge-fill').style.width = pct + '%';
+  document.getElementById('gauge-num').textContent   = C0.toFixed(1);
+}
+
+// ══════════════════════════════════════════════════════════════
+// Coastal Chart
+// ══════════════════════════════════════════════════════════════
+function updateCoastalChart() {
+  const C0 = riverConcentration(state.vehicles, state.rainfall, state.road, state.dry, state.area);
+  const dists = [], concs = [];
+  for (let d = 0; d <= 150; d += 2) { dists.push(d); concs.push(coastalConcentration(C0, d)); }
+  if (coastChart) { coastChart.destroy(); coastChart = null; }
+  const ctx = document.getElementById('coastalChart').getContext('2d');
+  coastChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: dists, datasets: [{
+      label: '예측 농도 (PREDICTED)',
+      data: concs, borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,0.08)',
+      fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2.5,
+    }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { font: { size: 11 } } },
+        tooltip: { callbacks: { title: c => c[0].label + ' km', label: c => ' ' + c.raw.toFixed(2) + ' ng/L' } } },
+      scales: {
+        x: { title: { display: true, text: '거리 (km)', font: { size: 11 } }, ticks: { maxTicksLimit: 10, font: { size: 10 } } },
+        y: { type: 'logarithmic',
+          title: { display: true, text: '농도 ng/L (log)', font: { size: 11 } },
+          ticks: { callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v.toFixed(0), font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// Fish Tabs
+// ══════════════════════════════════════════════════════════════
+function updateFishTabs() {
+  const C0    = results[0].concentration; // 한강 하구
+  const C1    = results[1].concentration; // 경기만 내해
+  const C2    = results[2].concentration; // 경기만 외해
+  const C3    = results[3].concentration; // 서해 연안
+
+  function riskLevel(c) {
+    return c > 500  ? { cls: 'risk-high',   text: '높음 — 주의 요망' }
+         : c > 100  ? { cls: 'risk-medium',  text: '중간 — 지속 모니터링 필요' }
+         :            { cls: 'risk-low',     text: '낮음 — 관찰 필요' };
+  }
+
+  // Tab 0 — 숭어 (한강 하구)
+  const mulletR = riskLevel(C0);
+  const mulletEl = document.getElementById('mullet-risk');
+  mulletEl.className = 'risk-badge ' + mulletR.cls;
+  mulletEl.textContent = mulletR.text;
+  document.getElementById('mullet-desc').innerHTML =
+    `한강 하구 예측 농도는 <strong>${C0.toFixed(1)} ng/L</strong>입니다.<br>
+    급성 치사보다는 <strong>산화 스트레스, 항산화 방어 체계 억제 및 성장 지연</strong>과 같은 만성적 피해가 우려됩니다.
+    또한, 멸종위기 II급 재두루미(Grus vipio)는 오염된 숭어 등 어류를 포식하여 6PPD-퀴논에 2차 노출될 위험이 있습니다.`;
+
+  // Tab 1 — 바지락 · 칠게 (경기만 내해)
+  const clamR = riskLevel(C1 * 3); // 칠게 등 저서 민감군 고려 보정
+  const clamEl = document.getElementById('clam-risk');
+  clamEl.className = 'risk-badge ' + clamR.cls;
+  clamEl.textContent = clamR.text;
+  document.getElementById('clam-desc').innerHTML =
+    `경기만 내해(5 km) 예측 농도는 <strong>${C1.toFixed(2)} ng/L</strong>입니다.<br>
+    바지락은 여과섭식 특성상 체내에 오염물질을 지속적으로 축적할 수 있습니다.
+    특히 칠게와 같은 저서 갑각류는 갯벌 간조 시 퇴적물에 남은 물질과 직접 접촉하여 <strong>개체군 성장률 감소 등 중등도의 만성 독성 피해</strong>가 일어날 수 있습니다.`;
+
+  // Tab 2 — 상괭이 · 조기 (경기만 외해)
+  const finlessRisk = C2 > 50 ? { cls: 'risk-high',   text: '높음 — 먹이사슬 농축 심각' }
+                    : C2 > 10 ? { cls: 'risk-medium',  text: '중간 — 체내 농축 주의' }
+                    :           { cls: 'risk-low',     text: '낮음 — 간접 노출 모니터링' };
+  const finlessEl = document.getElementById('finless-risk');
+  finlessEl.className = 'risk-badge ' + finlessRisk.cls;
+  finlessEl.textContent = finlessRisk.text;
+  document.getElementById('finless-desc').innerHTML =
+    `경기만 외해(30 km) 수층 예측 농도는 <strong>${C2.toFixed(2)} ng/L</strong>입니다.<br>
+    수중의 직접적인 농도는 옅어지지만, <strong>먹이사슬(조기 → 상괭이)을 거치며 생물 농축(Bioconcentration)</strong>이 발생합니다.
+    최상위 포식자인 상괭이는 지방 조직 내 고농축으로 인해 <strong>번식력 저하 및 면역 체계 이상</strong> 위험에 노출될 수 있습니다.`;
+
+  // Tab 3 — 흰발농게 · 꽃게 (서해 연안)
+  const fiddlerR = riskLevel(C3 * 10); // 퇴적물 잔류 보정
+  const fiddlerEl = document.getElementById('fiddler-risk');
+  fiddlerEl.className = 'risk-badge ' + fiddlerR.cls;
+  fiddlerEl.textContent = fiddlerR.text;
+  document.getElementById('fiddler-desc').innerHTML =
+    `서해 연안(80 km) 예측 농도는 <strong>${C3.toFixed(3)} ng/L</strong>입니다.<br>
+    수층 농도 자체는 매우 낮으나, 입자성 물질인 6PPD-퀴논이 해저 퇴적물에 침강하여 오랫동안 잔류합니다.
+    이로 인해 갯벌과 바다 밑바닥을 터전으로 삼는 흰발농게와 꽃게 등은 <strong>장기적이고 만성적인 저농도 노출에 지속적으로 피해</strong>를 입게 됩니다.`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// Zone Popup
+// ══════════════════════════════════════════════════════════════
+function openZonePopup(idx) {
+  const zone = ZONES[idx];
+  const conc  = results[idx] ? results[idx].concentration : 0;
+  const warnColor = conc > 1000 ? '#b91c1c' : conc > 100 ? '#92400e' : '#065f46';
+  const warnText  = conc > 1000 ? '위험' : conc > 100 ? '주의' : '낮음';
+  document.getElementById('zone-modal-body').innerHTML = `
+    <div class="modal-zone-header">
+      <div class="modal-zone-accent"></div>
+      <div>
+        <div class="modal-zone-name">${zone.label}</div>
+        <div class="modal-zone-dist">한강 하구로부터 <strong>${zone.distance} km</strong></div>
+      </div>
+      <span class="predicted-badge" style="margin-left:auto;">PREDICTED</span>
+    </div>
+    <div class="modal-conc-box">
+      <div class="modal-conc-label">예측 6PPD-퀴논 농도</div>
+      <div class="modal-conc-num">${conc.toFixed(2)}</div>
+      <div class="modal-conc-unit">ng/L &nbsp;<span class="predicted-badge">PREDICTED</span></div>
+    </div>
+    <div class="modal-grid">
+      <div class="modal-info-card">
+        <div class="modal-info-label">대표 생물</div>
+        <div class="modal-info-val">${zone.bio}</div>
+      </div>
+      <div class="modal-info-card">
+        <div class="modal-info-label">위험 수준</div>
+        <div class="modal-info-val" style="color:${warnColor};">${warnText}</div>
+      </div>
+    </div>
+    <div class="modal-warn-box">${zone.warn}</div>`;
+  document.getElementById('zone-modal').classList.add('open');
+}
+function closeZonePopup() {
+  document.getElementById('zone-modal').classList.remove('open');
+}
+document.getElementById('zone-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeZonePopup();
+});
+
+// ══════════════════════════════════════════════════════════════
+// PANORAMA CANVAS
+// ══════════════════════════════════════════════════════════════
+const panCanvas = document.getElementById('panoramaCanvas');
+const panCtx    = panCanvas.getContext('2d');
+const PW = 1184, PH = 370;
+
+// Segment x boundaries
+const SEG = {
+  cityEnd  : 248,   // end of city/road
+  drainEnd : 330,   // end of drain transition
+  riverEnd : 430,   // end of Han River proper
+  z0End    : 600,   // 한강 하구 end
+  z1End    : 760,   // 경기만 내해 end
+  z2End    : 950,   // 경기만 외해 end
+              // 서해 연안: 950 → PW
+};
+
+const WATER_Y = 175; // water surface y-level
+const ROAD_Y  = 185; // road surface top
+
+// Clickable zone definitions
+const PAN_ZONES = [
+  { x: SEG.riverEnd, x2: SEG.z0End, label: '한강 하구',   zoneIdx: 0 },
+  { x: SEG.z0End,    x2: SEG.z1End, label: '경기만 내해', zoneIdx: 1 },
+  { x: SEG.z1End,    x2: SEG.z2End, label: '경기만 외해', zoneIdx: 2 },
+  { x: SEG.z2End,    x2: PW,        label: '서해 연안',   zoneIdx: 3 },
+];
+
+let hoveredZone = -1;
+let carX  = -80;
+let dustParticles = [], rainDrops = [], pollutantParticles = [];
+
+function initParticles() {
+  // Dust on road
+  dustParticles = [];
+  for (let i = 0; i < 55; i++) {
+    dustParticles.push({
+      x: 15 + Math.random() * (SEG.cityEnd - 30),
+      y: ROAD_Y + 8 + Math.random() * 18,
+      r: 1.2 + Math.random() * 2,
+      vx: 0, vy: 0, flowing: false,
+      alpha: 0.45 + Math.random() * 0.4
+    });
+  }
+  // Rain
+  rainDrops = [];
+  for (let i = 0; i < 35; i++) {
+    rainDrops.push({
+      x: Math.random() * SEG.cityEnd,
+      y: Math.random() * ROAD_Y,
+      speed: 4 + Math.random() * 4
+    });
+  }
+  // Pollutant particles in water (from drain to sea)
+  pollutantParticles = [];
+  for (let i = 0; i < 80; i++) {
+    pollutantParticles.push({
+      x: SEG.drainEnd + Math.random() * (PW - SEG.drainEnd),
+      y: WATER_Y + 15 + Math.random() * (PH - WATER_Y - 30),
+      vx: 0.6 + Math.random() * 1.2,
+      vy: (Math.random() - 0.5) * 0.4,
+      r: 1.8 + Math.random() * 2.8,
+      alpha: 0.55 + Math.random() * 0.35,
+    });
+  }
+}
+initParticles();
+
+function drawPanorama() {
+  panCtx.clearRect(0, 0, PW, PH);
+
+  // ── 1. SKY ──────────────────────────────────────────────
+  const skyG = panCtx.createLinearGradient(0, 0, PW, 0);
+  skyG.addColorStop(0,    '#0d1b2e');
+  skyG.addColorStop(0.20, '#13243d');
+  skyG.addColorStop(0.35, '#1a3a5c');
+  skyG.addColorStop(0.55, '#1e5280');
+  skyG.addColorStop(1,    '#93c5fd');
+  panCtx.fillStyle = skyG;
+  panCtx.fillRect(0, 0, PW, WATER_Y);
+
+  // ── 2. CITY GROUND (left of drain) ──────────────────────
+  panCtx.fillStyle = '#1e293b';
+  panCtx.fillRect(0, WATER_Y, SEG.drainEnd, PH - WATER_Y);
+
+  // Road surface
+  panCtx.fillStyle = '#374151';
+  panCtx.fillRect(0, ROAD_Y, SEG.cityEnd, 32);
+  // Sidewalk
+  panCtx.fillStyle = '#4b5563';
+  panCtx.fillRect(0, ROAD_Y + 32, SEG.cityEnd, 8);
+  // Lane marking
+  panCtx.strokeStyle = '#fbbf24';
+  panCtx.setLineDash([18, 12]);
+  panCtx.lineWidth = 2;
+  panCtx.beginPath();
+  panCtx.moveTo(0, ROAD_Y + 16);
+  panCtx.lineTo(SEG.cityEnd, ROAD_Y + 16);
+  panCtx.stroke();
+  panCtx.setLineDash([]);
+
+  // ── 3. BUILDINGS ────────────────────────────────────────
+  const buildings = [
+    { x: 8,   w: 42, h: 95  },
+    { x: 56,  w: 58, h: 130 },
+    { x: 120, w: 48, h: 85  },
+    { x: 174, w: 62, h: 148 },
+  ];
+  buildings.forEach(b => {
+    const bg = panCtx.createLinearGradient(b.x, 0, b.x + b.w, 0);
+    bg.addColorStop(0, '#1a3252');
+    bg.addColorStop(1, '#253d60');
+    panCtx.fillStyle = bg;
+    panCtx.fillRect(b.x, ROAD_Y - b.h, b.w, b.h);
+    // Windows
+    for (let wy = ROAD_Y - b.h + 10; wy < ROAD_Y - 10; wy += 16) {
+      for (let wx = b.x + 6; wx < b.x + b.w - 6; wx += 12) {
+        panCtx.fillStyle = Math.random() > 0.35
+          ? 'rgba(255,225,100,0.55)' : 'rgba(30,55,90,0.8)';
+        panCtx.fillRect(wx, wy, 6, 9);
+      }
+    }
+  });
+
+  // ── 4. DRAIN PIPE ────────────────────────────────────────
+  panCtx.lineWidth = 8;
+  panCtx.strokeStyle = '#4b5563';
+  panCtx.lineJoin = 'round';
+  panCtx.beginPath();
+  panCtx.moveTo(SEG.cityEnd, ROAD_Y + 18);
+  panCtx.lineTo(SEG.cityEnd + 16, ROAD_Y + 18);
+  panCtx.lineTo(SEG.cityEnd + 16, WATER_Y + 40);
+  panCtx.lineTo(SEG.drainEnd + 20, WATER_Y + 40);
+  panCtx.stroke();
+  // Drain opening indicator
+  panCtx.fillStyle = '#374151';
+  panCtx.fillRect(SEG.cityEnd - 2, ROAD_Y + 12, 12, 12);
+
+  // ── 5. WATER BODY (right of drain) ──────────────────────
+  // Han River
+  const hanW = panCtx.createLinearGradient(SEG.drainEnd, 0, SEG.riverEnd, 0);
+  hanW.addColorStop(0, '#1e3a7a');
+  hanW.addColorStop(1, '#1e40af');
+  panCtx.fillStyle = hanW;
+  panCtx.fillRect(SEG.drainEnd, WATER_Y, SEG.riverEnd - SEG.drainEnd, PH - WATER_Y);
+
+  // Zone water colors
+  const zoneWaters = [
+    { x: SEG.riverEnd, x2: SEG.z0End, c1: '#1a56db', c2: '#1a66c8' },  // 한강 하구
+    { x: SEG.z0End,    x2: SEG.z1End, c1: '#0e6fab', c2: '#0a5f94' },  // 경기만 내해
+    { x: SEG.z1End,    x2: SEG.z2End, c1: '#0a5080', c2: '#084068' },  // 경기만 외해
+    { x: SEG.z2End,    x2: PW,        c1: '#062e54', c2: '#041e3a' },  // 서해 연안
+  ];
+  zoneWaters.forEach(z => {
+    const g = panCtx.createLinearGradient(z.x, 0, z.x2, 0);
+    g.addColorStop(0, z.c1);
+    g.addColorStop(1, z.c2);
+    panCtx.fillStyle = g;
+    panCtx.fillRect(z.x, WATER_Y, z.x2 - z.x, PH - WATER_Y);
+  });
+
+  // Water surface shimmer
+  panCtx.strokeStyle = 'rgba(255,255,255,0.07)';
+  panCtx.lineWidth = 1;
+  for (let wi = 0; wi < 5; wi++) {
+    const wy = WATER_Y + 8 + wi * 18 + (Date.now() / 1200 % 1) * 18;
+    panCtx.setLineDash([30, 20]);
+    panCtx.beginPath();
+    panCtx.moveTo(SEG.drainEnd, wy);
+    panCtx.lineTo(PW, wy);
+    panCtx.stroke();
+  }
+  panCtx.setLineDash([]);
+
+  // ── 6. ZONE DIVIDERS + LABELS ────────────────────────────
+  PAN_ZONES.forEach((z, i) => {
+    const w  = z.x2 - z.x;
+    const cx = z.x + w / 2;
+
+    // Hover highlight
+    if (hoveredZone === i) {
+      panCtx.fillStyle = 'rgba(249,115,22,0.12)';
+      panCtx.fillRect(z.x, 0, w, PH);
+      panCtx.strokeStyle = 'rgba(249,115,22,0.5)';
+      panCtx.lineWidth = 1.5;
+      panCtx.setLineDash([]);
+      panCtx.strokeRect(z.x + 1, 1, w - 2, PH - 2);
+    }
+
+    // Divider
+    panCtx.strokeStyle = 'rgba(255,255,255,0.18)';
+    panCtx.lineWidth = 1;
+    panCtx.setLineDash([5, 5]);
+    panCtx.beginPath();
+    panCtx.moveTo(z.x, 0);
+    panCtx.lineTo(z.x, PH);
+    panCtx.stroke();
+    panCtx.setLineDash([]);
+
+    // Zone label (top)
+    panCtx.fillStyle = 'rgba(255,255,255,0.92)';
+    panCtx.font = 'bold 13px "Noto Sans KR", sans-serif';
+    panCtx.textAlign = 'center';
+    panCtx.fillText(z.label, cx, 24);
+
+    // Distance label
+    panCtx.fillStyle = 'rgba(147,197,253,0.8)';
+    panCtx.font = '10px "Noto Sans KR", sans-serif';
+    panCtx.fillText(ZONES[i].distance + ' km', cx, 40);
+
+    // Click hint
+    panCtx.fillStyle = hoveredZone === i ? 'rgba(249,115,22,1)' : 'rgba(249,115,22,0.65)';
+    panCtx.font = '10px "Noto Sans KR", sans-serif';
+    panCtx.fillText('▲ 클릭', cx, 56);
+
+    // Concentration at bottom
+    if (results.length > i) {
+      const conc = results[i].concentration;
+      panCtx.fillStyle = 'rgba(253,186,116,0.95)';
+      panCtx.font = 'bold 12px "Noto Sans KR", sans-serif';
+      panCtx.fillText(conc.toFixed(2) + ' ng/L', cx, PH - 22);
+      panCtx.fillStyle = 'rgba(255,255,255,0.45)';
+      panCtx.font = '9px "Noto Sans KR", sans-serif';
+      panCtx.fillText('PREDICTED', cx, PH - 8);
+    }
+  });
+  panCtx.textAlign = 'left';
+
+  // ── 7. CITY / RIVER / TRANSITION LABELS ─────────────────
+  panCtx.fillStyle = 'rgba(255,255,255,0.8)';
+  panCtx.font = 'bold 13px "Noto Sans KR", sans-serif';
+  panCtx.textAlign = 'center';
+  panCtx.fillText('서울 도로', SEG.cityEnd / 2, 24);
+  panCtx.fillStyle = 'rgba(249,115,22,0.75)';
+  panCtx.font = '10px "Noto Sans KR", sans-serif';
+  panCtx.fillText('6PPD-Q 발생', SEG.cityEnd / 2, 40);
+  panCtx.fillStyle = 'rgba(255,255,255,0.7)';
+  panCtx.font = 'bold 12px "Noto Sans KR", sans-serif';
+  panCtx.fillText('한강', (SEG.drainEnd + SEG.riverEnd) / 2, 24);
+  panCtx.textAlign = 'left';
+
+  // ── 8. FLOW ARROW (water surface) ───────────────────────
+  panCtx.strokeStyle = 'rgba(255,255,255,0.2)';
+  panCtx.lineWidth = 1;
+  panCtx.setLineDash([12, 8]);
+  panCtx.beginPath();
+  panCtx.moveTo(SEG.drainEnd + 10, WATER_Y + 35);
+  panCtx.lineTo(PW - 20, WATER_Y + 35);
+  panCtx.stroke();
+  panCtx.setLineDash([]);
+  // Arrowhead
+  panCtx.fillStyle = 'rgba(255,255,255,0.2)';
+  panCtx.beginPath();
+  panCtx.moveTo(PW - 18, WATER_Y + 30);
+  panCtx.lineTo(PW - 5,  WATER_Y + 35);
+  panCtx.lineTo(PW - 18, WATER_Y + 40);
+  panCtx.fill();
+
+  // ── 9. RAIN DROPS ────────────────────────────────────────
+  if (state.rainfall > 5) {
+    const ra = Math.min(state.rainfall / 100, 0.7);
+    rainDrops.forEach(d => {
+      d.y += d.speed * (state.rainfall / 35);
+      if (d.y > ROAD_Y + 30) { d.y = -10; d.x = Math.random() * SEG.cityEnd; }
+      panCtx.strokeStyle = `rgba(147,197,253,${ra})`;
+      panCtx.lineWidth = 1;
+      panCtx.beginPath();
+      panCtx.moveTo(d.x, d.y);
+      panCtx.lineTo(d.x - 2, d.y + 9);
+      panCtx.stroke();
+    });
+  }
+
+  // ── 10. DUST PARTICLES ON ROAD ───────────────────────────
+  const dustCount = Math.min(55, Math.floor(15 + (state.vehicles / 5e6) * 40 * (state.dry / 14)));
+  const isRaining = state.rainfall > 15;
+  for (let i = 0; i < dustCount; i++) {
+    const p = dustParticles[i];
+    if (!p) continue;
+    if (isRaining && !p.flowing) { p.flowing = true; p.vx = 0.7 + Math.random(); }
+    if (p.flowing) {
+      p.x += p.vx * (state.rainfall / 25);
+      if (p.x > SEG.cityEnd + 5) { p.x = 10 + Math.random() * 80; p.flowing = false; }
+    }
+    panCtx.beginPath();
+    panCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    panCtx.fillStyle = `rgba(139,90,43,${p.alpha})`;
+    panCtx.fill();
+  }
+
+  // ── 11. POLLUTANT PARTICLES (6PPD-Q in water) ────────────
+  const speedMult = 0.6 + state.rainfall / 40;
+  pollutantParticles.forEach(p => {
+    p.x += p.vx * speedMult;
+    p.y += p.vy;
+    const waterBottom = PH - 8;
+    if (p.y < WATER_Y + 12) p.vy =  Math.abs(p.vy);
+    if (p.y > waterBottom)   p.vy = -Math.abs(p.vy);
+    if (p.x > PW + 15) {
+      p.x = SEG.drainEnd + Math.random() * 60;
+      p.y = WATER_Y + 15 + Math.random() * (PH - WATER_Y - 30);
+    }
+    const progress = Math.max(0, (p.x - SEG.drainEnd) / (PW - SEG.drainEnd));
+    const alpha = p.alpha * Math.max(0, 1 - progress * 0.88);
+    if (alpha < 0.04) return;
+    const glow = panCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 3);
+    glow.addColorStop(0, `rgba(249,115,22,${alpha})`);
+    glow.addColorStop(1, `rgba(249,115,22,0)`);
+    panCtx.beginPath(); panCtx.arc(p.x, p.y, p.r * 3, 0, Math.PI * 2);
+    panCtx.fillStyle = glow; panCtx.fill();
+    panCtx.beginPath(); panCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    panCtx.fillStyle = `rgba(249,115,22,${alpha})`; panCtx.fill();
+  });
+
+  // ── 12. CAR ──────────────────────────────────────────────
+  carX += 1.2 + state.vehicles / 2.5e6;
+  if (carX > SEG.cityEnd + 60) carX = -85;
+  drawMiniCar(panCtx, carX, ROAD_Y + 4);
+
+  // ── 13. 6PPD OXIDATION PROCESS (Underground Diagram) ──────
+  const oxX = 25;
+  const oxY = 250;
+  
+  // Background box for clarity
+  panCtx.fillStyle = 'rgba(15, 23, 42, 0.5)';
+  panCtx.beginPath();
+  panCtx.roundRect(oxX, oxY, 190, 75, 8);
+  panCtx.fill();
+  panCtx.strokeStyle = 'rgba(75, 85, 99, 0.5)';
+  panCtx.lineWidth = 1;
+  panCtx.stroke();
+
+  panCtx.textAlign = 'center';
+
+  // 6PPD (Tire)
+  panCtx.fillStyle = '#6b7280'; // gray
+  panCtx.beginPath();
+  panCtx.arc(oxX + 40, oxY + 30, 16, 0, Math.PI * 2);
+  panCtx.fill();
+  panCtx.fillStyle = '#ffffff';
+  panCtx.font = 'bold 11px "Noto Sans KR", sans-serif';
+  panCtx.fillText('6PPD', oxX + 40, oxY + 34);
+  panCtx.fillStyle = 'rgba(156, 163, 175, 0.9)';
+  panCtx.font = '10px "Noto Sans KR", sans-serif';
+  panCtx.fillText('타이어 보호제', oxX + 40, oxY + 60);
+
+  // Arrow + Ozone
+  panCtx.strokeStyle = '#fbbf24'; // yellow
+  panCtx.lineWidth = 1.5;
+  panCtx.setLineDash([3, 3]);
+  panCtx.beginPath();
+  panCtx.moveTo(oxX + 65, oxY + 30);
+  panCtx.lineTo(oxX + 120, oxY + 30);
+  panCtx.stroke();
+  panCtx.setLineDash([]);
+  
+  // Arrow head
+  panCtx.fillStyle = '#fbbf24';
+  panCtx.beginPath();
+  panCtx.moveTo(oxX + 122, oxY + 30);
+  panCtx.lineTo(oxX + 115, oxY + 26);
+  panCtx.lineTo(oxX + 115, oxY + 34);
+  panCtx.fill();
+  
+  // O3 Text
+  panCtx.fillStyle = '#fbbf24';
+  panCtx.font = 'bold 11px "Noto Sans KR", sans-serif';
+  panCtx.fillText('+ O₃ (오존)', oxX + 93, oxY + 22);
+
+  // 6PPD-Q
+  panCtx.fillStyle = '#f97316'; // orange
+  panCtx.beginPath();
+  panCtx.arc(oxX + 150, oxY + 30, 16, 0, Math.PI * 2);
+  panCtx.fill();
+  
+  // glow effect for 6PPD-Q
+  const qGlow = panCtx.createRadialGradient(oxX + 150, oxY + 30, 10, oxX + 150, oxY + 30, 24);
+  qGlow.addColorStop(0, 'rgba(249,115,22,0.8)');
+  qGlow.addColorStop(1, 'rgba(249,115,22,0)');
+  panCtx.fillStyle = qGlow;
+  panCtx.beginPath();
+  panCtx.arc(oxX + 150, oxY + 30, 24, 0, Math.PI * 2);
+  panCtx.fill();
+
+  panCtx.fillStyle = '#ffffff';
+  panCtx.font = 'bold 11px "Noto Sans KR", sans-serif';
+  panCtx.fillText('6PPD-Q', oxX + 150, oxY + 34);
+  panCtx.fillStyle = 'rgba(249, 115, 22, 0.9)';
+  panCtx.font = 'bold 10px "Noto Sans KR", sans-serif';
+  panCtx.fillText('독성 변환물질', oxX + 150, oxY + 60);
+
+  // Arrow pointing to drain pipe
+  panCtx.strokeStyle = 'rgba(249, 115, 22, 0.6)';
+  panCtx.lineWidth = 1.5;
+  panCtx.setLineDash([4, 4]);
+  panCtx.beginPath();
+  panCtx.moveTo(oxX + 150, oxY + 75);
+  panCtx.lineTo(oxX + 190, oxY + 95);
+  panCtx.stroke();
+  panCtx.setLineDash([]);
+  
+  // Arrow head down-right
+  panCtx.fillStyle = 'rgba(249, 115, 22, 0.6)';
+  panCtx.beginPath();
+  panCtx.moveTo(oxX + 192, oxY + 96);
+  panCtx.lineTo(oxX + 184, oxY + 96);
+  panCtx.lineTo(oxX + 188, oxY + 90);
+  panCtx.fill();
+  
+  panCtx.fillStyle = 'rgba(249, 115, 22, 0.8)';
+  panCtx.font = '10px "Noto Sans KR", sans-serif';
+  panCtx.fillText('빗물 유입', oxX + 195, oxY + 105);
+
+  panCtx.textAlign = 'left';
+}
+
+function drawMiniCar(ctx, x, y) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = '#3b82f6';
+  ctx.beginPath(); ctx.roundRect(0, 10, 62, 20, 3); ctx.fill();
+  ctx.fillStyle = '#2563eb';
+  ctx.beginPath(); ctx.roundRect(10, 2, 38, 12, 3); ctx.fill();
+  [9, 46].forEach(wx => {
+    ctx.beginPath(); ctx.arc(wx, 30, 8, 0, Math.PI * 2);
+    ctx.fillStyle = '#1f2937'; ctx.fill();
+    ctx.beginPath(); ctx.arc(wx, 30, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#6b7280'; ctx.fill();
+  });
+  ctx.fillStyle = '#fef08a';
+  ctx.fillRect(57, 13, 6, 5);
+  ctx.restore();
+}
+
+// Mouse interaction
+panCanvas.addEventListener('mousemove', function(e) {
+  const rect  = panCanvas.getBoundingClientRect();
+  const scaleX = PW / rect.width;
+  const x = (e.clientX - rect.left) * scaleX;
+  let found = -1;
+  PAN_ZONES.forEach((z, i) => { if (x >= z.x && x < z.x2) found = i; });
+  hoveredZone = found;
+  panCanvas.style.cursor = found >= 0 ? 'pointer' : 'default';
+});
+panCanvas.addEventListener('click', function(e) {
+  const rect  = panCanvas.getBoundingClientRect();
+  const scaleX = PW / rect.width;
+  const x = (e.clientX - rect.left) * scaleX;
+  PAN_ZONES.forEach((z, i) => { if (x >= z.x && x < z.x2) openZonePopup(i); });
+});
+panCanvas.addEventListener('mouseleave', function() { hoveredZone = -1; panCanvas.style.cursor = 'default'; });
+
+// Animation loop
+function animate() {
+  drawPanorama();
+  requestAnimationFrame(animate);
+}
+
+// ══════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════
+updateAll();
+animate();
+</script>
+</body>
+</html>
